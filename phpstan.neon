@@ -1,0 +1,11 @@
+parameters:
+	level: 8
+	paths:
+		- src
+		- tests
+		- bin
+		- public
+	ignoreErrors:
+		- identifier: missingType.iterableValue
+		- '#Call to an undefined method .+?Entity.+?\(\)#'
+		- '#.+?is never read, only written.+?#'

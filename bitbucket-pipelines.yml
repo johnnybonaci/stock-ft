@@ -1,0 +1,142 @@
+image: php
+
+definitions:
+  services:
+    docker:
+      memory: 2048
+  steps:
+    - step: &scan-with-sonarqube
+        name: Code Quality -> SonarQube Scan
+        image: maven:3.9.9
+        max-time: 20
+        size: 2x
+        caches:
+          - sonar
+        script:
+          - |
+            if [ "$BITBUCKET_PR_DESTINATION_BRANCH" = "develop" ] && [ "$PIPELINE_SONAR_CHECK" = "true" ]; then
+              echo -e "\n\n\n>>\n>>\n>>> Destination Branch Develop and PIPELINE_SONAR_CHECK enabled, run Code Quality -> SonarQube Scan.\n>>\n>>\n\n"
+            else
+              echo -e "\n\n\n>>\n>>\n>>> ⚠️ Skipping SonarQube - PR not targeting develop or PIPELINE_SONAR_CHECK is disabled.\n>>\n>>\n\n"
+              exit 0
+            fi
+          - pipe: sonarsource/sonarqube-scan:3.1.0
+            variables:
+              SONAR_HOST_URL: ${SONAR_HOST_URL}
+              SONAR_TOKEN: ${SONAR_TOKEN}
+              EXTRA_ARGS: >-
+                -X
+                -Dsonar.projectKey=pilotcrmwebdev_${BITBUCKET_REPO_SLUG}
+                -Dsonar.scanner.timeoutSeconds=600
+          - |
+              SONAR_PROJECT_KEY=pilotcrmwebdev_${BITBUCKET_REPO_SLUG}
+              echo "Esperando resultados del análisis de SonarQube para: ${SONAR_PROJECT_KEY}"
+            
+              TIMEOUT=300  # 5 minutos de timeout
+              START_TIME=$(date +%s)
+            
+              while true; do
+                # Primero verificamos el estado del análisis
+                ANALYSIS_STATUS=$(curl -sf -u "${SONAR_TOKEN}:" "${SONAR_HOST_URL}/api/ce/component?component=${SONAR_PROJECT_KEY}" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+              
+                if [ "$ANALYSIS_STATUS" = "SUCCESS" ]; then
+                  # Si el análisis está completo, verificamos el Quality Gate
+                  RESULT=$(curl -sf -u "${SONAR_TOKEN}:" "${SONAR_HOST_URL}/api/qualitygates/project_status?projectKey=${SONAR_PROJECT_KEY}")
+                  echo "Resultado actual: $RESULT"
+                
+                  STATUS=$(echo $RESULT | awk -F'"status":"' '{print $2}' | awk -F'"' '{print $1}')
+                
+                  if [ "$STATUS" = "ERROR" ]; then
+                    echo -e "\n\n>>\n>>\n>>> ⛔ Quality Gate failed! The PullRequest cannot be processed because it does not meet the quality standard."
+                    echo -e ">>> ⛔ Report: sonarqube.services.pilotcrm.io/dashboard?id=${SONAR_PROJECT_KEY}\n>>\n>>\n"
+                    exit 1
+                  elif [ "$STATUS" = "OK" ] || [ "$STATUS" = "NONE" ]; then
+                    echo -e "\n\n>>\n>>\n>>> ✅ Quality Gate passed! The code meets quality standards."
+                    echo -e ">>> ✅ Report: sonarqube.services.pilotcrm.io/dashboard?id=${SONAR_PROJECT_KEY}\n>>\n>>\n"
+                    exit 0
+                  fi
+                elif [ "$ANALYSIS_STATUS" = "FAILED" ]; then
+                  echo "El análisis de SonarQube ha fallado"
+                  exit 1
+                fi
+              
+                # Verificar timeout
+                CURRENT_TIME=$(date +%s)
+                if [ $((CURRENT_TIME - START_TIME)) -gt $TIMEOUT ]; then
+                  echo "Timeout esperando los resultados del análisis de SonarQube"
+                  exit 1
+                fi
+              
+                echo "Análisis en progreso (Estado: $ANALYSIS_STATUS), esperando 10 segundos..."
+                sleep 10
+              done
+
+    - step: &aws-codebuild-deploy
+        name: AWS CodeBuild -> Run Deploy
+        image: amazon/aws-cli
+        script:
+          - |
+            if [ "$PIPELINE_BUILD_ENABLE" = "true" ]; then
+              echo -e "\n\n\n>>\n>>\n>>> Global environment PIPELINE_BUILD_ENABLE is "true", run AWS CodeBuild.\n>>\n>>\n\n"
+            else
+              echo -e "\n\n\n>>\n>>\n>>> ⚠️ Skipping AWS CodeBuild - PIPELINE_BUILD_ENABLE is disabled.\n>>\n>>\n\n"
+              exit 0
+            fi
+          - |
+            aws configure set aws_access_key_id ${AWS_CODEBUILD_SERVICES_KEY}
+            aws configure set aws_secret_access_key ${AWS_CODEBUILD_SERVICES_SECRET}
+            aws configure set region ${AWS_CODEBUILD_SERVICES_REGION}
+            
+            BUILD_ID=$(aws codebuild start-build \
+              --project-name pilot-ms-autodeploy \
+              --region ${AWS_CODEBUILD_SERVICES_REGION} \
+              --environment-variables-override "[
+                {\"name\":\"PROJECT_NAME\",\"value\":\"$BITBUCKET_REPO_SLUG\",\"type\":\"PLAINTEXT\"},
+                {\"name\":\"BRANCH\",\"value\":\"$BITBUCKET_BRANCH\",\"type\":\"PLAINTEXT\"}
+              ]" \
+              --query 'build.id' \
+              --output text)
+            
+            echo "Build Started with ID: $BUILD_ID"
+            
+            while true; do
+              BUILD_STATUS=$(aws codebuild batch-get-builds \
+                --region ${AWS_CODEBUILD_SERVICES_REGION} \
+                --ids $BUILD_ID \
+                --query 'builds[0].buildStatus' \
+                --output text)
+              
+              echo "Current Build Status: $BUILD_STATUS"
+              
+              if [ "$BUILD_STATUS" = "SUCCEEDED" ]; then
+                echo -e "\n\n>>\n>>\n>>> ✅ Build Successful.\n>>\n>>\n"
+                exit 0
+              elif [[ "$BUILD_STATUS" == "FAILED" || "$BUILD_STATUS" == "FAULT" || "$BUILD_STATUS" == "TIMED_OUT" || "$BUILD_STATUS" == "STOPPED" ]]; then
+                echo -e "\n\n>>\n>>\n>>> ⛔ Build Failed with status: $BUILD_STATUS\n>>\n>>\n"
+                exit 1
+              fi
+              
+              sleep 10
+            done
+
+  caches:
+    sonar: ~/.sonar
+
+clone:
+  depth: full
+
+pipelines:
+  pull-requests:
+    '**':
+      - parallel:
+          - step: *scan-with-sonarqube
+
+  branches:
+    develop:
+      - step: *aws-codebuild-deploy
+    stage:
+      - step: *aws-codebuild-deploy
+    master:
+      - step: *aws-codebuild-deploy
+
+

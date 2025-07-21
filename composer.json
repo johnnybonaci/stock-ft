@@ -1,0 +1,163 @@
+{
+    "name": "pilot/hub-ft-factory-stock",
+    "type": "project",
+    "description": "Administración de la entidad Stock en Red (Factory Stock) para el BI del HUB con importación de archivos para carga masiva de datos",
+    "keywords": [
+        "slim-framework",
+        "skeleton",
+        "slim",
+        "slim4",
+        "apache"
+    ],
+    "license": "MIT",
+    "repositories" : [
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/exceptions.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/cache-manager.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/var-environment.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/microservice-client.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/abstracts.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/request-parameter.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/renderers.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/error-handler.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/xray-middleware.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/logger.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/security.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/session-manager.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/page-templating.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/translations.git"
+        },
+        {
+            "type": "git",
+            "url": "git@bitbucket.org:pilotcrmwebdev/sql.git"
+        }
+    ],
+    "require": {
+        "php": "^7.4 || ^8.0",
+        "ext-json": "*",
+        "cakephp/chronos": "^2",
+        "cakephp/validation": "^4.2",
+        "fig/http-message-util": "^1.1",
+        "nyholm/psr7": "^1.4",
+        "nyholm/psr7-server": "^1.0",
+        "php-di/php-di": "^6",
+        "pilot/abstracts": "^1.0",
+        "pilot/cache-manager": "0.4.1",
+        "pilot/error-handler": "^1.0",
+        "pilot/logger": "^1.0",
+        "pilot/microservice-client": "^1.0",
+        "pilot/renderers": "^1.0",
+        "pilot/request-parameter": "^1.0",
+        "pilot/session-manager": "^1.0",
+        "pilot/sql": "^1.0",
+        "pilot/var-environment": "^1.0",
+        "pilot/xray-middleware": "1.0",
+        "pkerrigan/xray": "^1.4",
+        "respect/validation": "^2.3",
+        "selective/array-reader": "^1.1",
+        "selective/basepath": "^2",
+        "selective/validation": "^2",
+        "slim/slim": "^4",
+        "symfony/cache": "^5.3",
+        "symfony/console": "^5",
+        "symfony/polyfill-uuid": "^1.22",
+        "symfony/yaml": "^5.2",
+        "tuupola/slim-jwt-auth": "^3.6"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3",
+        "mikey179/vfsstream": "^1.6",
+        "overtrue/phplint": "^3",
+        "phpstan/phpstan": "1.*",
+        "phpunit/phpunit": "^8 || ^9",
+        "selective/test-traits": "^2",
+        "squizlabs/php_codesniffer": "^3",
+        "symfony/filesystem": "^5",
+        "symfony/finder": "^5",
+        "zeuxisoo/slim-whoops": "0.7.*"
+    },
+    "config": {
+        "process-timeout": 0,
+        "sort-packages": true,
+        "platform": {
+            "php": "8.2"
+	}
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "App\\Test\\": "tests/"
+        }
+    },
+    "scripts": {
+        "cs:check": "php-cs-fixer fix --dry-run --format=txt --verbose --diff --config=.cs.php --ansi",
+        "cs:fix": "php-cs-fixer fix --config=.cs.php --ansi",
+        "lint": "phplint ./ --exclude=vendor --no-interaction --no-cache --ansi",
+        "stan": "phpstan -v analyse -c phpstan.neon --no-progress --ansi",
+        "schema:dump": "php bin/console.php schema-dump --ansi",
+        "sniffer:check": "phpcs --standard=phpcs.xml -v -s",
+        "sniffer:fix": "phpcbf --standard=phpcs.xml -v -s",
+        "test": "phpunit --configuration phpunit.xml --do-not-cache-result --colors=always",
+        "fix:all": [
+            "@cs:fix",
+            "@sniffer:fix",
+            "@lint"
+        ],
+        "test:all": [
+            "@cs:check",
+            "@sniffer:check",
+            "@stan",
+            "@test"
+        ],
+        "test:deploy": [
+            "@cs:check",
+            "@sniffer:check",
+            "@stan"
+        ],
+        "test:coverage": "php -d xdebug.mode=coverage -r \"require 'vendor/bin/phpunit';\" -- --configuration phpunit.xml --do-not-cache-result --colors=always --coverage-clover build/logs/clover.xml --coverage-html build/coverage"
+    }
+}
