@@ -7,6 +7,7 @@ use App\Constant\ValidationConstants;
 use App\Domain\Dealer\Repository\DealerRepository;
 use App\Domain\Stock\Data\StockData;
 use App\Domain\Stock\Data\StockParameter;
+use App\Domain\Stock\Data\StockErrorCodes;
 use App\Exception\InvalidBusinessRulesException;
 
 class DealerExist extends BusinessRuleAbstract
@@ -17,13 +18,23 @@ class DealerExist extends BusinessRuleAbstract
         $result = $repository->getRowByCode($this->getDsn(), $data->getDealerCode());
 
         if ($result->getVisible() == 0 and !in_array($data->getDealerCode(), ValidationConstants::LK_DEFAULT_VALUE_ARRAY)) {
+            $error = StockErrorCodes::getErrorMessage(StockErrorCodes::E_200_107);
             throw new InvalidBusinessRulesException(
-                sprintf('%s value not available', StockParameter::DEALER_CODE)
+                $error['message'],
+                [],
+                $error['code'],
+                $error['subcode']
             );
         }
 
         if ($result->getDeleted() == 1) {
-            throw new InvalidBusinessRulesException(sprintf('%s value not available', StockParameter::DEALER_CODE));
+            $error = StockErrorCodes::getErrorMessage(StockErrorCodes::E_200_107);
+            throw new InvalidBusinessRulesException(
+                $error['message'],
+                [],
+                $error['code'],
+                $error['subcode']
+            );
         }
 
         $data->setDealerId($result->getId());
